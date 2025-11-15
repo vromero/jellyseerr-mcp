@@ -78,10 +78,16 @@ class JellyseerrClient:
         if is_4k:
             service_slug += "_4k"
 
-        service = next((s for s in media_details.get("services", []) if s.get("slug") == service_slug), None)
+        services = media_details.get("services", [])
+        service = next((s for s in services if s.get("slug") == service_slug), None)
         
         if not service:
-            raise ValueError(f"Could not find a service matching slug '{service_slug}' for media_id {media_id}")
+            valid_slugs = [s.get("slug") for s in services if s.get("slug")]
+            valid_slugs_str = ", ".join(f"'{slug}'" for slug in valid_slugs) if valid_slugs else "none"
+            raise ValueError(
+                f"Could not find a service matching slug '{service_slug}' for media_id {media_id}. "
+                f"Available services: {valid_slugs_str}"
+            )
 
         payload = {
             "mediaId": media_details["id"],
