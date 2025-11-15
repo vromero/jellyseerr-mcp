@@ -68,33 +68,110 @@ class JellyseerrClient:
         encoded_query = quote_plus(query)
         return await self.request("GET", "search", params={"query": encoded_query})
 
-    async def request_media(self, media_id: int, media_type: str, is_4k: bool = False) -> Any:
-        # Discover media details to find the correct media ID to request
+    async def request_media(
+        self,
+        media_id: int,
+        media_type: str,
+        is_4k: bool = False,
+        seasons: Optional[list[int]] = None,
+        server_id: Optional[int] = None,
+        service_slug: Optional[str] = None,
+    ) -> Any:
+        """
+        Create a media request in Jellyseerr.
+        
+        Args:
+            media_id: The media ID from search results
+            media_type: "movie" or "tv"
+            is_4k: Whether to request 4K quality (default: False)
+            seasons: For TV shows, list of season numbers to request (None = all seasons)
+            server_id: Specific server/service ID to use (overrides service_slug)
+            service_slug: Specific service slug to use (e.g., "radarr", "sonarr", "radarr_4k")
+        
+        Returns:
+            The created request data from Jellyseerr API
+        """
+        # Validate media_type
+        if media_type not in ("movie", "tv"):
+            raise ValueError(f"Invalid media_type '{media_type}'. Must be 'movie' or 'tv'")
+        
+        # Discover media details to find the correct media ID and available services
         media_details = await self.request("GET", f"{media_type}/{media_id}")
         
-        # Jellyseerr API requests are complex. We need to find the service `id` for the desired quality.
-        # This is a simplified example; a real implementation would need to handle seasons, etc.
-        service_slug = "radarr" if media_type == "movie" else "sonarr"
-        if is_4k:
-            service_slug += "_4k"
-
+        # Get available services
         services = media_details.get("services", [])
-        service = next((s for s in services if s.get("slug") == service_slug), None)
+        if not services:
+            raise ValueError(f"No services available for media_id {media_id} (media_type: {media_type})")
         
-        if not service:
-            valid_slugs = [s.get("slug") for s in services if s.get("slug")]
-            valid_slugs_str = ", ".join(f"'{slug}'" for slug in valid_slugs) if valid_slugs else "none"
-            raise ValueError(
-                f"Could not find a service matching slug '{service_slug}' for media_id {media_id}. "
-                f"Available services: {valid_slugs_str}"
-            )
-
-        payload = {
+        # Select service
+        service = None
+        if server_id:
+            # Use explicitly provided server_id
+            service = next((s for s in services if s.get("id") == server_id), None)
+            if not service:
+                available_ids = [s.get("id") for s in services if s.get("id") is not None]
+                raise ValueError(
+                    f"Server ID {server_id} not found for media_id {media_id}. "
+                    f"Available server IDs: {available_ids}"
+                )
+        elif service_slug:
+            # Use explicitly provided service_slug
+            service = next((s for s in services if s.get("slug") == service_slug), None)
+            if not service:
+                valid_slugs = [s.get("slug") for s in services if s.get("slug")]
+                valid_slugs_str = ", ".join(f"'{slug}'" for slug in valid_slugs) if valid_slugs else "none"
+                raise ValueError(
+                    f"Service slug '{service_slug}' not found for media_id {media_id}. "
+                    f"Available services: {valid_slugs_str}"
+                )
+        else:
+            # Auto-select service based on media_type and is_4k preference
+            preferred_slug = "radarr" if media_type == "movie" else "sonarr"
+            if is_4k:
+                preferred_slug += "_4k"
+            
+            # Try preferred service first
+            service = next((s for s in services if s.get("slug") == preferred_slug), None)
+            
+            # If preferred not found, try non-4K version
+            if not service and is_4k:
+                fallback_slug = "radarr" if media_type == "movie" else "sonarr"
+                service = next((s for s in services if s.get("slug") == fallback_slug), None)
+            
+            # If still not found, use first available service
+            if not service:
+                service = services[0]
+        
+        # Build request payload
+        payload: Dict[str, Any] = {
             "mediaId": media_details["id"],
             "mediaType": media_type,
             "is4k": is_4k,
             "serverId": service["id"],
         }
+        
+        # For TV shows, add seasons if specified
+        if media_type == "tv":
+            if seasons is not None:
+                # Validate seasons exist in the media
+                available_seasons = media_details.get("seasons", [])
+                available_season_numbers = [s.get("seasonNumber") for s in available_seasons if s.get("seasonNumber") is not None]
+                
+                # Check if all requested seasons are available
+                invalid_seasons = [s for s in seasons if s not in available_season_numbers]
+                if invalid_seasons:
+                    raise ValueError(
+                        f"Invalid season numbers {invalid_seasons} for media_id {media_id}. "
+                        f"Available seasons: {available_season_numbers}"
+                    )
+                
+                # Build seasons array with full season objects
+                payload["seasons"] = [
+                    s for s in available_seasons
+                    if s.get("seasonNumber") in seasons
+                ]
+            # If seasons is None, Jellyseerr will request all seasons by default
+        
         return await self.request("POST", "request", json=payload)
 
     async def get_request(self, request_id: int) -> Any:

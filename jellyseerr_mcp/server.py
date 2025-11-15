@@ -53,11 +53,31 @@ def create_server() -> Tuple[FastMCP, JellyseerrClient]:
             logger.exception("Full error details:")
             raise
 
-    @server.tool(name="request_media", description="Create a media request in Jellyseerr.")
-    async def request_media(media_id: int, media_type: str) -> Any:  # type: ignore[override]
-        logger.info(f"📥 Requesting media id={media_id} type={media_type}")
+    @server.tool(
+        name="request_media",
+        description="Create a media request in Jellyseerr. For TV shows, you can optionally specify seasons to request."
+    )
+    async def request_media(
+        media_id: int,
+        media_type: str,
+        is_4k: bool = False,
+        seasons: list[int] | None = None,
+        server_id: int | None = None,
+        service_slug: str | None = None,
+    ) -> Any:  # type: ignore[override]
+        logger.info(
+            f"📥 Requesting media id={media_id} type={media_type} "
+            f"(4K: {is_4k}, seasons: {seasons}, server_id: {server_id}, service_slug: {service_slug})"
+        )
         try:
-            data = await client.request_media(media_id=media_id, media_type=media_type)
+            data = await client.request_media(
+                media_id=media_id,
+                media_type=media_type,
+                is_4k=is_4k,
+                seasons=seasons,
+                server_id=server_id,
+                service_slug=service_slug,
+            )
             logger.info("✅ Request created")
             return data
         except Exception as e:
