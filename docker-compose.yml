@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  jellyseerr-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jellyseerr-mcp
+    restart: unless-stopped
+    ports:
+      - "${FASTMCP_PORT:-8000}:8000"
+    environment:
+      # Jellyseerr API configuration (required)
+      - JELLYSEERR_URL=${JELLYSEERR_URL}
+      - JELLYSEERR_API_KEY=${JELLYSEERR_API_KEY}
+      - JELLYSEERR_TIMEOUT=${JELLYSEERR_TIMEOUT:-15}
+      
+      # MCP server configuration
+      - MCP_TRANSPORT=${MCP_TRANSPORT:-sse}
+      - FASTMCP_HOST=${FASTMCP_HOST:-0.0.0.0}
+      - FASTMCP_PORT=${FASTMCP_PORT:-8000}
+      - FASTMCP_MOUNT_PATH=${FASTMCP_MOUNT_PATH:-/}
+      
+      # Authentication (optional, for HTTP transports)
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:-}
+      - AUTH_RESOURCE_SERVER_URL=${AUTH_RESOURCE_SERVER_URL:-}
+      - AUTH_REQUIRED_SCOPES=${AUTH_REQUIRED_SCOPES:-}
+      - AUTH_BEARER_TOKENS=${AUTH_BEARER_TOKENS:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+

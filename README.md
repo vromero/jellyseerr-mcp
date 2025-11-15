@@ -24,6 +24,42 @@ JELLYSEERR_TIMEOUT=15
 ```
 
 ## Running the MCP server
+
+### Docker (Recommended)
+
+The easiest way to run the server is using Docker Compose:
+
+1. Create a `.env` file with your configuration:
+```bash
+JELLYSEERR_URL=https://your-jellyseerr.example.com
+JELLYSEERR_API_KEY=your_api_key_here
+JELLYSEERR_TIMEOUT=15
+MCP_TRANSPORT=sse
+FASTMCP_PORT=8000
+AUTH_ENABLED=false
+```
+
+2. Build and run with Docker Compose:
+```bash
+docker-compose up -d
+```
+
+Or build and run with Docker directly:
+```bash
+docker build -t jellyseerr-mcp .
+docker run -d \
+  --name jellyseerr-mcp \
+  -p 8000:8000 \
+  -e JELLYSEERR_URL=https://your-jellyseerr.example.com \
+  -e JELLYSEERR_API_KEY=your_api_key_here \
+  -e MCP_TRANSPORT=sse \
+  jellyseerr-mcp
+```
+
+The server will be available at `http://localhost:8000` (or your configured port).
+
+### Local Development
+
 This server supports stdio (default) and optional HTTP transports.
 
 Stdio (recommended for MCP clients):
