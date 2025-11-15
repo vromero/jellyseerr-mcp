@@ -46,9 +46,20 @@ class JellyseerrClient:
             return resp.json()
         except httpx.HTTPStatusError as e:
             detail = e.response.text
-            raise RuntimeError(f"Jellyseerr API error for '{e.request.method} {e.request.url}': {e.response.status_code} - {detail}") from e
+            status_code = e.response.status_code
+            error_msg = f"Jellyseerr API error for '{e.request.method} {e.request.url}': HTTP {status_code}"
+            if detail:
+                error_msg += f" - {detail}"
+            else:
+                error_msg += f" - {e.response.reason_phrase or 'Unknown error'}"
+            raise RuntimeError(error_msg) from e
         except httpx.RequestError as e:
-            raise RuntimeError(f"Jellyseerr connection error for '{e.request.method} {e.request.url}': {e}") from e
+            error_msg = f"Jellyseerr connection error for '{method.upper()} {url}': {type(e).__name__}"
+            if str(e):
+                error_msg += f" - {e}"
+            raise RuntimeError(error_msg) from e
+        except Exception as e:
+            raise RuntimeError(f"Unexpected error calling Jellyseerr API '{method.upper()} {url}': {type(e).__name__}: {e}") from e
 
 
     # Convenience methods for common operations

@@ -44,23 +44,38 @@ def create_server() -> Tuple[FastMCP, JellyseerrClient]:
     @server.tool(name="search_media", description="Search Jellyseerr for media by text query.")
     async def search_media(query: str) -> Any:  # type: ignore[override]
         logger.info(f"🔎 Searching media for query: [bold cyan]{query}[/]")
-        data = await client.search_media(query)
-        logger.info("✅ Search complete")
-        return data
+        try:
+            data = await client.search_media(query)
+            logger.info("✅ Search complete")
+            return data
+        except Exception as e:
+            logger.error(f"❌ Search failed for query '[bold cyan]{query}[/]': [bold red]{type(e).__name__}[/]: {e}")
+            logger.exception("Full error details:")
+            raise
 
     @server.tool(name="request_media", description="Create a media request in Jellyseerr.")
     async def request_media(media_id: int, media_type: str) -> Any:  # type: ignore[override]
         logger.info(f"📥 Requesting media id={media_id} type={media_type}")
-        data = await client.request_media(media_id=media_id, media_type=media_type)
-        logger.info("✅ Request created")
-        return data
+        try:
+            data = await client.request_media(media_id=media_id, media_type=media_type)
+            logger.info("✅ Request created")
+            return data
+        except Exception as e:
+            logger.error(f"❌ Request failed for media_id={media_id} type={media_type}: [bold red]{type(e).__name__}[/]: {e}")
+            logger.exception("Full error details:")
+            raise
 
     @server.tool(name="get_request", description="Get Jellyseerr request details/status by id.")
     async def get_request(request_id: int) -> Any:  # type: ignore[override]
         logger.info(f"📄 Fetching request #{request_id}")
-        data = await client.get_request(request_id=request_id)
-        logger.info("✅ Request fetched")
-        return data
+        try:
+            data = await client.get_request(request_id=request_id)
+            logger.info("✅ Request fetched")
+            return data
+        except Exception as e:
+            logger.error(f"❌ Failed to fetch request #{request_id}: [bold red]{type(e).__name__}[/]: {e}")
+            logger.exception("Full error details:")
+            raise
 
     @server.tool(name="raw_request", description="(Advanced) Low-level tool to call any Jellyseerr endpoint. Use with caution.")
     async def raw_request(method: str, endpoint: str, params: dict | None = None, body: dict | None = None) -> Any:  # type: ignore[override]
@@ -68,11 +83,18 @@ def create_server() -> Tuple[FastMCP, JellyseerrClient]:
         
         allowed_methods = {"GET", "POST", "PUT", "DELETE"}
         if method.upper() not in allowed_methods:
-            raise ValueError(f"Unsupported method: {method}. Must be one of {allowed_methods}")
+            error_msg = f"Unsupported method: {method}. Must be one of {allowed_methods}"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
 
-        data = await client.request(method=method, endpoint=endpoint, params=params, json=body)
-        logger.info("✅ Raw request complete")
-        return data
+        try:
+            data = await client.request(method=method, endpoint=endpoint, params=params, json=body)
+            logger.info("✅ Raw request complete")
+            return data
+        except Exception as e:
+            logger.error(f"❌ Raw request failed {method.upper()} {endpoint}: [bold red]{type(e).__name__}[/]: {e}")
+            logger.exception("Full error details:")
+            raise
 
     # Health endpoints for HTTP transports/direct probing by clients
     @server.custom_route("/", methods=["GET"])
